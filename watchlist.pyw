@@ -16,8 +16,18 @@ class WatchListApp(QMainWindow):
         self.central = QWidget()
         self.setCentralWidget(self.central)
 
+        #main vertical layout (for search bar + rest of UI)
+        self.main_layout = QVBoxLayout(self.central)
+
+        #search bar at the top
+        self.search_bar = QLineEdit()
+        self.search_bar.setPlaceholderText("Search by show name, episode number, or watch status...")
+        self.search_bar.textChanged.connect(self.filter_table)
+        self.main_layout.addWidget(self.search_bar)
+
         #setup layout for left side
-        self.layout = QHBoxLayout(self.central)
+        self.layout = QHBoxLayout()
+        self.main_layout.addLayout(self.layout)
 
         #setup table
         self.table = QTableWidget()
@@ -87,6 +97,9 @@ class WatchListApp(QMainWindow):
         self.selected_row = None
         self.selected_col = None
 
+        #store all table data for filtering
+        self.all_table_data = []
+
     #open CSV file if formatted right and remove duplicates
     def open_csv(self):
         #open file
@@ -136,6 +149,24 @@ class WatchListApp(QMainWindow):
         self.edit_box.setText("")
         self.edit_box.setEnabled(False)
         self.save_btn.setEnabled(False)
+        #store all data for filtering
+        self.all_table_data = [row[:] for row in rows[1:]]
+
+    #filter the table based on the search bar input
+    def filter_table(self, text):
+        text = text.strip().lower()
+        self.table.setRowCount(0)
+        for row in self.all_table_data:
+            if (
+                text in row[0].lower()
+                or text in row[1].lower()
+                or text in row[2].lower()
+            ):
+                row_pos = self.table.rowCount()
+                self.table.insertRow(row_pos)
+                for c, val in enumerate(row):
+                    self.table.setItem(row_pos, c, QTableWidgetItem(val))
+        self.table.resizeColumnsToContents()
 
     #handle cell clicks
     def on_cell_clicked(self, row, col):
@@ -188,6 +219,19 @@ class WatchListApp(QMainWindow):
                 self.table.setItem(self.selected_row, 1, QTableWidgetItem(self.edit_box_episode.text()))
             if self.edit_box_status.isEnabled():
                 self.table.setItem(self.selected_row, 2, QTableWidgetItem(self.edit_box_status.text()))
+        #update all_table_data to reflect changes
+        self.update_all_table_data()
+
+    #update the all_table_data list from the current table contents
+    def update_all_table_data(self):
+        data = []
+        for row in range(self.table.rowCount()):
+            row_data = []
+            for col in range(self.table.columnCount()):
+                item = self.table.item(row, col)
+                row_data.append(item.text() if item else "")
+            data.append(row_data)
+        self.all_table_data = data
 
     #remove current selected show from table
     def remove_selected_show(self):
@@ -199,6 +243,7 @@ class WatchListApp(QMainWindow):
             self.edit_box.setEnabled(False)
             self.save_btn.setEnabled(False)
             self.remove_btn.setEnabled(False)
+            self.update_all_table_data()
 
     #add new show to the table
     def add_new_show(self):
@@ -243,9 +288,12 @@ class WatchListApp(QMainWindow):
         self.add_show_name.clear()
         self.add_episode_number.clear()
         self.add_watch_status.clear()
+        self.update_all_table_data()
 
     #saves the current table data to a CSV file
     def save_csv(self):
+        #undo filtering before saving: show all rows
+        self.filter_table("")  #clear filter to show all data
         path, _ = QFileDialog.getSaveFileName(self, "Save CSV", "", "CSV Files (*.csv)")
         if not path:
             return
