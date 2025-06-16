@@ -11,13 +11,8 @@ on:
     types: [published]
 
 jobs:
-  build:
-    name: Build on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-
+  build-windows:
+    runs-on: windows-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -34,27 +29,93 @@ jobs:
 
       - name: Build executable
         run: |
-          pyinstaller watchlist.pyw --name=WatchList --onefile --windowed
-          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            mv dist/WatchList dist/WatchListLinux
-          elif [ "${{ matrix.os }}" = "windows-latest" ]; then
-            mv dist/WatchList.exe dist/WatchListWindows.exe
-          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-            mv dist/WatchList dist/WatchListMacOS
-          fi
+          pyinstaller watchlist.pyw --name=WatchListWindows --onefile --windowed
 
       - name: Upload executable
         uses: actions/upload-artifact@v4
         with:
-          name: WatchList-${{ matrix.os == 'ubuntu-latest' && 'linux' || (matrix.os == 'windows-latest' && 'windows' || 'macos') }}
-          path: |
-            dist/WatchListLinux
-            dist/WatchListMacOS
-            dist/WatchListWindows.exe
+          name: WatchListWindows
+          path: dist/WatchListWindows.exe
+
+      - name: Upload to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/WatchListWindows.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller PySide6
+
+      - name: Build executable
+        run: |
+          pyinstaller watchlist.pyw --name=WatchListLinux --onefile --windowed
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: WatchListLinux
+          path: dist/WatchListLinux
+
+      - name: Upload to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/WatchListLinux
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller PySide6
+
+      - name: Build executable
+        run: |
+          pyinstaller watchlist.pyw --name=WatchListMacOS --onefile --windowed
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: WatchListMacOS
+          path: dist/WatchListMacOS
+
+      - name: Upload to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/WatchListMacOS
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release:
     name: Attach executables to GitHub Release
-    needs: build
+    needs: [build-windows, build-linux, build-macos]
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
     steps:
