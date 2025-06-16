@@ -1,11 +1,14 @@
 name: Build WatchList Executable
 
+permissions:
+  contents: write
+
 on:
-  push:
-    paths:
-      - '**.pyw'
-      - '.github/workflows/build-executable.yml'
   workflow_dispatch:
+  push:
+    branches: [ main ]
+  release:
+    types: [published]
 
 jobs:
   build:
@@ -38,3 +41,25 @@ jobs:
         with:
           name: WatchList-${{ matrix.os == 'ubuntu-latest' && 'linux' || (matrix.os == 'windows-latest' && 'windows' || 'macos') }}
           path: dist/WatchList*
+
+  release:
+    name: Attach executables to GitHub Release
+    needs: build
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts for debug
+        run: ls -R artifacts
+
+      - name: Upload assets to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/**/WatchList*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
