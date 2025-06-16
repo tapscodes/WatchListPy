@@ -23,7 +23,8 @@ class WatchListApp(QMainWindow):
         self.table = QTableWidget()
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.cellClicked.connect(self.on_cell_clicked)
-        self.table.verticalHeader().setVisible(False)  # Hide index column
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)  #select the whole row when clicked
+        self.table.verticalHeader().setVisible(False)  #hide index column
         self.layout.addWidget(self.table)
         self.table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
@@ -31,12 +32,19 @@ class WatchListApp(QMainWindow):
         self.side_panel = QVBoxLayout()
         self.layout.addLayout(self.side_panel)
 
-        #edit selected cell section
+        #edit selected value section
         self.edit_label = QLabel("Edit Selected Cell:")
         self.side_panel.addWidget(self.edit_label)
         self.edit_box = QLineEdit()
         self.edit_box.setEnabled(False)
         self.side_panel.addWidget(self.edit_box)
+        self.edit_box_episode = QLineEdit()
+        self.edit_box_episode.setEnabled(False)
+        self.side_panel.addWidget(self.edit_box_episode)
+        self.edit_box_status = QLineEdit()
+        self.edit_box_status.setEnabled(False)
+        self.side_panel.addWidget(self.edit_box_status)
+
         self.save_btn = QPushButton("Save Change")
         self.save_btn.setEnabled(False)
         self.save_btn.clicked.connect(self.save_cell_edit)
@@ -131,22 +139,55 @@ class WatchListApp(QMainWindow):
 
     #handle cell clicks
     def on_cell_clicked(self, row, col):
-        item = self.table.item(row, col)
-        if item:
-            self.selected_row = row
-            self.selected_col = col
-            self.edit_box.setText(item.text())
+        #when a row is selected, always show the show name in the main edit box
+        self.selected_row = row
+        self.selected_col = col
+        name_item = self.table.item(row, 0)
+        episode_item = self.table.item(row, 1)
+        status_item = self.table.item(row, 2)
+        #always set the edit_box to the show name, regardless of which cell is clicked
+        if name_item:
+            self.edit_box.setText(name_item.text())
             self.edit_box.setEnabled(True)
+        else:
+            self.edit_box.clear()
+            self.edit_box.setEnabled(False)
+        if episode_item:
+            self.edit_box_episode.setText(episode_item.text())
+            self.edit_box_episode.setEnabled(True)
+        else:
+            self.edit_box_episode.clear()
+            self.edit_box_episode.setEnabled(False)
+        if status_item:
+            self.edit_box_status.setText(status_item.text())
+            self.edit_box_status.setEnabled(True)
+        else:
+            self.edit_box_status.clear()
+            self.edit_box_status.setEnabled(False)
+        #enable/disable buttons
+        if name_item:
             self.save_btn.setEnabled(True)
             self.remove_btn.setEnabled(True)
         else:
+            self.save_btn.setEnabled(False)
             self.remove_btn.setEnabled(False)
 
     #save new edited value to cell
     def save_cell_edit(self):
-        if self.selected_row is not None and self.selected_col is not None:
-            new_val = self.edit_box.text()
-            self.table.setItem(self.selected_row, self.selected_col, QTableWidgetItem(new_val))
+        # Save all three edit fields back to the selected row
+        if self.selected_row is not None:
+            # Only update the cell that was selected with edit_box
+            if self.selected_col == 0:
+                self.table.setItem(self.selected_row, 0, QTableWidgetItem(self.edit_box.text()))
+            elif self.selected_col == 1:
+                self.table.setItem(self.selected_row, 1, QTableWidgetItem(self.edit_box.text()))
+            elif self.selected_col == 2:
+                self.table.setItem(self.selected_row, 2, QTableWidgetItem(self.edit_box.text()))
+            # Also update episode and status fields if enabled
+            if self.edit_box_episode.isEnabled():
+                self.table.setItem(self.selected_row, 1, QTableWidgetItem(self.edit_box_episode.text()))
+            if self.edit_box_status.isEnabled():
+                self.table.setItem(self.selected_row, 2, QTableWidgetItem(self.edit_box_status.text()))
 
     #remove current selected show from table
     def remove_selected_show(self):
